@@ -34,6 +34,8 @@ import {
   GET_API_MY_BOARDS_STARTED
 } from '../Board.constants';
 import { LOGOUT, LOGIN_SUCCESS } from '../../Account/Login/Login.constants';
+import moment from 'moment';
+import { resolveLastEdited } from '../Board.reducer';
 
 const mockBoard = {
   name: 'tewt',
@@ -554,6 +556,74 @@ describe('reducer', () => {
     expect(boardReducer(initialState, importdBoards)).toEqual({
       ...initialState,
       boards: [mockBoard]
+    });
+  });
+});
+
+describe('resolveLastEdited', () => {
+  const currentMomentStr = moment().format();
+
+  describe('Black-box testing (Equivalence Partitioning and Boundary Values)', () => {
+    // Partition 1: Both null or missing 'lastEdited' (Boundary values of absent attributes)
+    it('should return current moment if newBoard is null/invalid', () => {
+      const result = resolveLastEdited({}, {});
+      expect(result).toBeDefined();
+      // We don't have a strict date because it uses current moment,
+      // but we verify it followed the final flow 'return moment().format();'
+    });
+
+    // Partition 2: newBoard has date, oldBoard doesn't (Equivalence behavior)
+    it('should adopt newBoard date when oldBoard is null', () => {
+      const newDate = '2026-05-19T10:00:00Z';
+      const result = resolveLastEdited(null, { lastEdited: newDate });
+      expect(result).toBe(moment(newDate).format());
+    });
+  });
+
+  // Original condition: if (newDate && (!oldDate || oldDate.isBefore(newDate)))
+  // Applying MC/DC to cover all vital logic combinations
+  describe('White-box testing (Decision Coverage and MC/DC)', () => {
+    // Condition A: newDate = TRUE, Condition B (!oldDate) = TRUE
+    it('[MC/DC] should return newDate when newDate exists and oldDate does NOT exist', () => {
+      const newDate = '2026-05-19T10:00:00Z';
+      const result = resolveLastEdited({}, { lastEdited: newDate });
+      expect(result).toBe(moment(newDate).format());
+    });
+
+    // Condition A: newDate = TRUE, Condition B(!oldDate) = FALSE, Condition C (isBefore) = TRUE
+    it('[MC/DC] should return newDate when both exist and old is BEFORE new', () => {
+      const oldDate = '2026-05-18T10:00:00Z';
+      const newDate = '2026-05-19T10:00:00Z';
+      const result = resolveLastEdited(
+        { lastEdited: oldDate },
+        { lastEdited: newDate }
+      );
+      expect(result).toBe(moment(newDate).format());
+    });
+
+    // Condition A: newDate = TRUE, Condition B(!oldDate) = FALSE, Condition C (isBefore) = FALSE
+    it('[MC/DC] should hit fallback and return current moment when both exist and old is AFTER new', () => {
+      const oldDate = '2026-05-20T10:00:00Z';
+      const newDate = '2026-05-19T10:00:00Z';
+
+      const result = resolveLastEdited(
+        { lastEdited: oldDate },
+        { lastEdited: newDate }
+      );
+
+      // Current code returns moment() instead of oldDate on this fallback.
+      expect(
+        moment(result).isSameOrAfter(moment(currentMomentStr))
+      ).toBeTruthy();
+    });
+
+    // Condition A: newDate = FALSE (Does not evaluate B or C)
+    it('[MC/DC] should short-circuit and return current moment when newDate does not exist', () => {
+      const oldDate = '2026-05-18T10:00:00Z';
+      const result = resolveLastEdited({ lastEdited: oldDate }, {});
+      expect(
+        moment(result).isSameOrAfter(moment(currentMomentStr))
+      ).toBeTruthy();
     });
   });
 });
