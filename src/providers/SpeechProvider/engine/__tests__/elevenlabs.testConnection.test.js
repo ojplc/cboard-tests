@@ -7,16 +7,16 @@ beforeEach(() => {
   mockFetch.mockClear();
 });
 
-describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', () => {
+describe('ElevenLabsEngine - testConnection() [white-box → black-box]', () => {
   const VALID_API_KEY = 'sk_abcdef1234567890abcdef1234567890abcdef1234567890';
 
   // ================================================================
-  // FASE 1: TESTES CAIXA-BRANCA — Cobertura Estrutural
+  // PHASE 1: WHITE-BOX TESTS — Structural Coverage
   // ================================================================
 
-  describe('FASE 1: Caixa-Branca — Cobertura de Decisões/Branches e MC/DC', () => {
-    describe('D1: Engine não inicializado (!isInitialized = true)', () => {
-      it('deve lançar erro se apiKey for null (engine não inicializado)', () => {
+  describe('PHASE 1: White-Box — Decision/Branch Coverage and MC/DC', () => {
+    describe('D1: Engine not initialized (!isInitialized = true)', () => {
+      it('should throw error if apiKey is null (engine not initialized)', () => {
         const engine = new ElevenLabsEngine(VALID_API_KEY);
         engine.reset();
 
@@ -26,8 +26,8 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
       });
     });
 
-    describe('D2=F | D4=F: Resposta bem-sucedida (response.ok = true)', () => {
-      it('deve retornar { isValid: true }', async () => {
+    describe('D2=F | D4=F: Successful response (response.ok = true)', () => {
+      it('should return { isValid: true }', async () => {
         mockFetch.mockResolvedValueOnce({ ok: true });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -47,7 +47,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
       });
     });
 
-    describe('D3: Decisão composta (MC/DC) — status === 401 || status === 400', () => {
+    describe('D3: Compound decision (MC/DC) — status === 401 || status === 400', () => {
       it('MC/DC-A: status=401 (A=T, B=F) → D3=T → UNAUTHORIZED', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
 
@@ -76,7 +76,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
       });
     });
 
-    describe('D2=T | D3=F: Outros status HTTP de erro (cobertura adicional de branches)', () => {
+    describe('D2=T | D3=F: Other HTTP error statuses (additional branch coverage)', () => {
       it('status=404 (A=F, B=F) → HTTP_404', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
 
@@ -86,7 +86,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: false, error: 'HTTP_404' });
       });
 
-      it('status=500 (erro servidor) → HTTP_500', async () => {
+      it('status=500 (server error) → HTTP_500', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -96,8 +96,8 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
       });
     });
 
-    describe('D4: Exceção no fetch (bloco catch)', () => {
-      it('deve retornar CONNECTION_ERROR quando fetch lançar exceção', async () => {
+    describe('D4: Fetch exception (catch block)', () => {
+      it('should return CONNECTION_ERROR when fetch throws exception', async () => {
         mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -109,12 +109,12 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
   });
 
   // ================================================================
-  // FASE 2: COMPLEMENTO CAIXA-PRETA
+  // PHASE 2: BLACK-BOX SUPPLEMENT
   // ================================================================
 
-  describe('FASE 2: Complemento Caixa-Preta — Particionamento de Equivalência e Valor Limite', () => {
-    describe('Particionamento de Equivalência (Classes de Resposta HTTP)', () => {
-      it('[PE1] Sucesso: qualquer status 2xx pertence à classe "isValid: true"', async () => {
+  describe('PHASE 2: Black-Box Supplement — Equivalence Partitioning and Boundary Value Analysis', () => {
+    describe('Equivalence Partitioning (HTTP Response Classes)', () => {
+      it('[EP1] Success: any 2xx status belongs to "isValid: true" class', async () => {
         mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -123,7 +123,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: true });
       });
 
-      it('[PE2] Não autorizado: status 401 e 400 pertencem à classe "UNAUTHORIZED"', async () => {
+      it('[EP2] Unauthorized: status 401 and 400 belong to "UNAUTHORIZED" class', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 400 });
 
         const engine1 = new ElevenLabsEngine(VALID_API_KEY);
@@ -138,7 +138,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result2).toEqual({ isValid: false, error: 'UNAUTHORIZED' });
       });
 
-      it('[PE3] Erro HTTP genérico: status 4xx (exceto 400/401) pertencem à classe "HTTP_<code>"', async () => {
+      it('[EP3] Generic HTTP error: 4xx status (except 400/401) belongs to "HTTP_<code>" class', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -147,7 +147,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: false, error: 'HTTP_403' });
       });
 
-      it('[PE4] Erro de servidor: status 5xx pertencem à classe "HTTP_<code>"', async () => {
+      it('[EP4] Server error: 5xx status belongs to "HTTP_<code>" class', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 502 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -156,7 +156,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: false, error: 'HTTP_502' });
       });
 
-      it('[PE5] Erro de rede: exceções de fetch pertencem à classe "CONNECTION_ERROR"', async () => {
+      it('[EP5] Network error: fetch exceptions belong to "CONNECTION_ERROR" class', async () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -166,8 +166,8 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
       });
     });
 
-    describe('Análise de Valor Limite (Fronteiras da Condição Composta status 400-401)', () => {
-      it('[VL1] Valor limite inferior: status=399 (abaixo de 400) → fora do conjunto UNAUTHORIZED', async () => {
+    describe('Boundary Value Analysis (Borders of the 400-401 Compound Condition)', () => {
+      it('[BV1] Lower boundary value: status=399 (below 400) → outside UNAUTHORIZED set', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 399 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -176,7 +176,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: false, error: 'HTTP_399' });
       });
 
-      it('[VL2] Valor na fronteira inferior: status=400 → dentro do conjunto UNAUTHORIZED', async () => {
+      it('[BV2] Value at lower border: status=400 → inside UNAUTHORIZED set', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 400 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -185,7 +185,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: false, error: 'UNAUTHORIZED' });
       });
 
-      it('[VL3] Valor na fronteira superior: status=401 → dentro do conjunto UNAUTHORIZED', async () => {
+      it('[BV3] Value at upper border: status=401 → inside UNAUTHORIZED set', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -194,7 +194,7 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
         expect(result).toEqual({ isValid: false, error: 'UNAUTHORIZED' });
       });
 
-      it('[VL4] Valor limite superior: status=402 (acima de 401) → fora do conjunto UNAUTHORIZED', async () => {
+      it('[BV4] Upper boundary value: status=402 (above 401) → outside UNAUTHORIZED set', async () => {
         mockFetch.mockResolvedValueOnce({ ok: false, status: 402 });
 
         const engine = new ElevenLabsEngine(VALID_API_KEY);
@@ -206,32 +206,23 @@ describe('ElevenLabsEngine - testConnection() [caixa-branca → caixa-preta]', (
   });
 
   // ================================================================
-  // RESUMO DA COBERTURA
+  // COVERAGE SUMMARY
   // ================================================================
 
-  describe('Resumo de Cobertura Combinada', () => {
-    it('Cobertura de Decisões/Branches (Caixa-Branca): 8/8 ramos → 100%', () => {
-      // D1: T (throw), F (prossegue)
-      // D2: T (erro HTTP), F (ok)
-      // D3: T (UNAUTHORIZED), F (HTTP_<code>)
-      // D4: T (catch), F (sem exceção)
+  describe('Combined Coverage Summary', () => {
+    it('Decision/Branch Coverage (White-Box): 8/8 branches → 100%', () => {
       expect(true).toBe(true);
     });
 
-    it('Cobertura MC/DC (Caixa-Branca): 3/3 pares → 100%', () => {
-      // A (status=401): (A=F,B=F)→(A=T,B=F) — pares 403→401
-      // B (status=400): (A=F,B=F)→(A=F,B=T) — pares 403→400
+    it('MC/DC Coverage (White-Box): 3/3 pairs → 100%', () => {
       expect(true).toBe(true);
     });
 
-    it('Particionamento de Equivalência (Caixa-Preta): 5 classes cobertas', () => {
-      // PE1: Sucesso, PE2: UNAUTHORIZED, PE3: Erro 4xx,
-      // PE4: Erro 5xx, PE5: Erro de rede
+    it('Equivalence Partitioning (Black-Box): 5 classes covered', () => {
       expect(true).toBe(true);
     });
 
-    it('Análise de Valor Limite (Caixa-Preta): 4 fronteiras testadas', () => {
-      // VL1: 399, VL2: 400, VL3: 401, VL4: 402
+    it('Boundary Value Analysis (Black-Box): 4 borders tested', () => {
       expect(true).toBe(true);
     });
   });
