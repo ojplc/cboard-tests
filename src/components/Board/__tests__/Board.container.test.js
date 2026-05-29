@@ -87,324 +87,275 @@ describe('Board.container', () => {
   });
 
   describe('componentDidMount', () => {
-    describe('MC/DC', () => {
-      let changeBoardMock;
-      let historyReplaceMock;
-      let baseProps;
+    let dispatchAndRouterProps;
 
-      beforeEach(() => {
-        changeBoardMock = jest.fn();
-        historyReplaceMock = jest.fn();
-
-        baseProps = {
-          navHistory: [],
-          intl: {
-            formatMessage: jest.fn(message => message?.id || '')
-          },
-          boards: [
-            { id: 'b1', isFixed: false },
-            { id: 'b2', isFixed: false },
-            { id: 'root-id', isFixed: true }
-          ],
-          communicator: {
-            rootBoard: 'root-id',
-            boards: ['b1', 'b2', 'root-id']
-          },
-          changeBoard: changeBoardMock,
-          addBoardCommunicator: jest.fn(),
-          history: { replace: historyReplaceMock }
-        };
-      });
-
-      it('TC1 Must return active board when id from request is equal to active board', async () => {
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'b1' } },
-          board: { id: 'b1' }
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(changeBoardMock).toHaveBeenCalledWith('b1');
-        expect(historyReplaceMock).toHaveBeenCalledWith('b1');
-      });
-
-      it('TC2 Must GET board when id is different from active board', async () => {
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'b2' } },
-          board: { id: 'b1' } // Active board is different from id
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        // Found 'b2' in local board list
-        expect(changeBoardMock).toHaveBeenCalledWith('b2');
-        expect(historyReplaceMock).toHaveBeenCalledWith('b2');
-      });
-
-      it('TC3 Must use GET board from id when there is no active board', async () => {
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'b2' } },
-          board: null // No active board
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(changeBoardMock).toHaveBeenCalledWith('b2');
-        expect(historyReplaceMock).toHaveBeenCalledWith('b2');
-      });
-
-      it('TC4 Must use active board when there is no id in the request', async () => {
-        const props = {
-          ...baseProps,
-          match: { params: {} }, // No ID
-          board: { id: 'b1' }
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(changeBoardMock).toHaveBeenCalledWith('b1');
-        expect(historyReplaceMock).toHaveBeenCalledWith('board/b1');
-      });
-
-      it('TC5 Must use rootBoard when there is no id in the route and no active board', async () => {
-        const props = {
-          ...baseProps,
-          match: { params: {} },
-          board: null
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(changeBoardMock).toHaveBeenCalledWith('root-id');
-        expect(historyReplaceMock).toHaveBeenCalledWith('board/root-id');
-        expect(wrapper.state('isFixedBoard')).toBe(true);
-      });
+    beforeEach(() => {
+      dispatchAndRouterProps = {
+        changeBoard: jest.fn(),
+        history: { replace: jest.fn(), push: jest.fn() },
+        location: { search: '' },
+        intl: {
+          formatMessage: jest.fn(() => 'mocked_text')
+        }
+      };
     });
 
-    describe('Black box', () => {
-      let changeBoardMock;
-      let historyReplaceMock;
-      let baseProps;
-      let tryRemoteBoardSpy;
+    it('id is equal to active board', async () => {
+      const boards = [{ id: 'b1', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = 'b1';
 
-      beforeEach(() => {
-        changeBoardMock = jest.fn();
-        historyReplaceMock = jest.fn();
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b1' } }
+      };
 
-        // Spy funtion tryRemoteBoard to simulate API response
-        tryRemoteBoardSpy = jest.spyOn(
-          BoardContainer.prototype,
-          'tryRemoteBoard'
-        );
-
-        baseProps = {
-          navHistory: [],
-          intl: {
-            formatMessage: jest.fn(message => message?.id || '')
-          },
-          boards: [
-            { id: 'b1', isFixed: false },
-            { id: 'b2', isFixed: false },
-            { id: 'root-id', isFixed: true }
-          ],
-          communicator: {
-            rootBoard: 'root-id',
-            boards: ['b1', 'b2', 'root-id']
-          },
-          changeBoard: changeBoardMock,
-          addBoardCommunicator: jest.fn(),
-          history: { replace: historyReplaceMock }
-        };
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
       });
+      const instance = wrapper.instance();
 
-      afterEach(() => {
-        // Clean mock after each test
-        tryRemoteBoardSpy.mockRestore();
-      });
+      await instance.componentDidMount();
 
-      it('BB1 - Found remote board correctly must download it and display it', async () => {
-        // Mock: tryRemoteBoard returns a valid object
-        tryRemoteBoardSpy.mockResolvedValue({ id: 'remote', isFixed: false });
-
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'remote' } }, // id = 'remote'
-          board: null
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(tryRemoteBoardSpy).toHaveBeenCalledWith('remote');
-        expect(changeBoardMock).toHaveBeenCalledWith('remote');
-        expect(historyReplaceMock).toHaveBeenCalledWith('remote');
-      });
-
-      it('BB2 - Remote board does not exist, return to active board', async () => {
-        // Mock: tryRemoteBoard throws an error
-        tryRemoteBoardSpy.mockRejectedValue(new Error('404 Not Found'));
-
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'invalid' } }, 
-          board: { id: 'b1' } // Active board
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(tryRemoteBoardSpy).toHaveBeenCalledWith('invalid');
-        // Redirects to active board
-        expect(changeBoardMock).toHaveBeenCalledWith('b1');
-        expect(historyReplaceMock).toHaveBeenCalledWith('b1');
-      });
-
-      it('BB3 - Remote board does not exist and there is no active board, return RootBoard', async () => {
-        // Mock: tryRemoteBoard throws error
-        tryRemoteBoardSpy.mockRejectedValue(new Error('404 Not Found'));
-
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'invalid' } }, // id = 'invalid'
-          board: null // No active board
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        expect(tryRemoteBoardSpy).toHaveBeenCalledWith('invalid');
-        // Points to rootBoard
-        expect(changeBoardMock).toHaveBeenCalledWith('root-id');
-        expect(historyReplaceMock).toHaveBeenCalledWith('root-id');
-      });
-
-      it('BB4 - Remote board does not exist, no active board and no rootBoard, return any board', async () => {
-        const props = {
-          ...baseProps,
-          match: { params: {} }, // No ID
-          board: null, // No active
-          boards: [{ id: 'survival', isFixed: false }], // Only one survival on the list
-          communicator: {
-            rootBoard: 'deleted' // Root board does not exist in local array
-          }
-        };
-
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
-
-        // Fetches first available board
-        expect(changeBoardMock).toHaveBeenCalledWith('survival');
-        expect(historyReplaceMock).toHaveBeenCalledWith('board/survival');
-      });
+      expect(props.changeBoard).toHaveBeenCalledWith('b1');
+      expect(props.history.replace).toHaveBeenCalledWith('b1');
     });
 
-    describe('Extra cases', () => {
-      let changeBoardMock;
-      let historyReplaceMock;
-      let baseProps;
-      let tryRemoteBoardSpy;
+    it('id different from active board, requested board is not available locally, tryRemoteBoard returns valid board', async () => {
+      const boards = [{ id: 'b1', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = 'b1';
 
-      beforeEach(() => {
-        changeBoardMock = jest.fn();
-        historyReplaceMock = jest.fn();
-        tryRemoteBoardSpy = jest.spyOn(
-          BoardContainer.prototype,
-          'tryRemoteBoard'
-        );
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } }
+      };
 
-        baseProps = {
-          navHistory: [],
-          intl: {
-            formatMessage: jest.fn(message => message?.id || '')
-          },
-          boards: [
-            { id: 'b1', isFixed: false },
-            { id: 'b2', isFixed: false },
-            { id: 'root-id', isFixed: true }
-          ],
-          communicator: {
-            rootBoard: 'root-id',
-            boards: ['b1', 'b2', 'root-id']
-          },
-          changeBoard: changeBoardMock,
-          addBoardCommunicator: jest.fn(),
-          history: { replace: historyReplaceMock }
-        };
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
       });
+      const instance = wrapper.instance();
 
-      afterEach(() => {
-        tryRemoteBoardSpy.mockRestore();
+      // tryRemoteBoard mock returns valid remoteBoard
+      jest
+        .spyOn(instance, 'tryRemoteBoard')
+        .mockResolvedValue({ id: 'b2', isFixed: false });
+
+      await instance.componentDidMount();
+
+      expect(instance.tryRemoteBoard).toHaveBeenCalledWith('b2');
+      expect(props.changeBoard).toHaveBeenCalledWith('b2');
+      expect(props.history.replace).toHaveBeenCalledWith('b2');
+    });
+
+    it('id different from active board, requested board is not available locally, tryRemoteBoard returns null, fallback to active board', async () => {
+      const boards = [{ id: 'b1', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = 'b1';
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
       });
+      const instance = wrapper.instance();
 
-      it('D2 Return correctly remote board even when there is an active board', async () => {
-        // Mock: tryRemoteBoard retorna o objeto da prancha com sucesso
-        tryRemoteBoardSpy.mockResolvedValue({ id: 'remote', isFixed: false });
+      // tryRemoteBoard mock returns null
+      jest.spyOn(instance, 'tryRemoteBoard').mockResolvedValue(null);
 
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'remote' } }, // ID on route
-          board: { id: 'b1' }, // Active board is different from route
-          boards: [{ id: 'b1' }] // Remote board is not saved locally
-        };
+      await instance.componentDidMount();
 
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
+      expect(instance.tryRemoteBoard).toHaveBeenCalledWith('b2');
+      // Assert returns to previous board ('b1')
+      expect(props.changeBoard).toHaveBeenCalledWith('b1');
+    });
 
-        expect(tryRemoteBoardSpy).toHaveBeenCalledWith('remote');
-        // fall to 'if (remoteBoard)'
-        expect(changeBoardMock).toHaveBeenCalledWith('remote');
-        expect(historyReplaceMock).toHaveBeenCalledWith('remote');
+    it('id different from active board, board available locally', async () => {
+      const boards = [
+        { id: 'b1', isFixed: false },
+        { id: 'b2', isFixed: false }
+      ];
+      const state = createState(boards);
+      state.board.activeBoardId = 'b1';
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
       });
+      const instance = wrapper.instance();
 
-      it('D2 Must return to active board when tryRemoteBoard returns null', async () => {
-        // Mock: tryRemoteBoard resolves Promise, but returns null for testing
-        tryRemoteBoardSpy.mockResolvedValue(null);
+      await instance.componentDidMount();
 
-        const props = {
-          ...baseProps,
-          match: { params: { id: 'remote' } }, // ID on route
-          board: { id: 'b1' }, // Active board different from route
-          boards: [{ id: 'b1' }] // Remote board is not saved locally
-        };
+      // Finds b2 locally
+      expect(props.changeBoard).toHaveBeenCalledWith('b2');
+    });
 
-        const wrapper = shallow(<BoardContainer {...props} />, {
-          disableLifecycleMethods: true
-        });
-        await wrapper.instance().componentDidMount();
+    it('No active board, requested id not available locally, tryRemoteBoard returns requested board', async () => {
+      const boards = [{ id: 'b1', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = null;
 
-        expect(tryRemoteBoardSpy).toHaveBeenCalledWith('remote');
-        // tryRemoteBoard returned null -> fall to else case and returns to previous board
-        expect(changeBoardMock).toHaveBeenCalledWith('b1');
-        expect(historyReplaceMock).toHaveBeenCalledWith('b1');
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
       });
+      const instance = wrapper.instance();
+
+      // mock returns remote board
+      jest
+        .spyOn(instance, 'tryRemoteBoard')
+        .mockResolvedValue({ id: 'b2', isFixed: false });
+
+      await instance.componentDidMount();
+
+      expect(props.changeBoard).toHaveBeenCalledWith('b2');
+    });
+
+    it('No active board, requested id is available locally', async () => {
+      const boards = [{ id: 'b2', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = null;
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
+      });
+      const instance = wrapper.instance();
+
+      await instance.componentDidMount();
+
+      expect(props.changeBoard).toHaveBeenCalledWith('b2');
+    });
+
+    it('Requested id is undefined, returns to active board', async () => {
+      const boards = [{ id: 'b1', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = 'b1';
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: undefined } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
+      });
+      const instance = wrapper.instance();
+
+      await instance.componentDidMount();
+
+      expect(props.changeBoard).toHaveBeenCalledWith('b1');
+      // adapts path to return correctly
+      expect(props.history.replace).toHaveBeenCalledWith('board/b1');
+    });
+
+    it('No id and no active board, fails to return rootBoard, returns any board', async () => {
+      const boards = [{ id: 'random_board', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = null;
+
+      state.communicator.communicators[0].rootBoard = null;
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: undefined } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
+      });
+      const instance = wrapper.instance();
+
+      await instance.componentDidMount();
+
+      // Fallback to first available board
+      expect(props.changeBoard).toHaveBeenCalledWith('random_board');
+      expect(props.history.replace).toHaveBeenCalledWith('board/random_board');
+    });
+
+    it('Error on tryRemoteBoard with active board (Catch 1)', async () => {
+      // 1. Setup: b1 is active board, tries to access b2
+      const boards = [{ id: 'b1', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = 'b1';
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } }
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
+      });
+      const instance = wrapper.instance();
+
+      // 2. mock api failing
+      jest
+        .spyOn(instance, 'tryRemoteBoard')
+        .mockRejectedValue(new Error('API unavailable'));
+
+      await instance.componentDidMount();
+
+      // 3. Verifies if the catch handled the error
+      expect(instance.tryRemoteBoard).toHaveBeenCalledWith('b2');
+      expect(props.changeBoard).toHaveBeenCalledWith('b1');
+    });
+
+    it('Error on tryRemoteBoard with no active board (Catch 2)', async () => {
+      // 1. Setup: Only rootBoard available
+      const boards = [{ id: 'root_board', isFixed: false }];
+      const state = createState(boards);
+      state.board.activeBoardId = null;
+
+      // Sets up to return rootBoard
+      state.communicator.communicators[0].rootBoard = 'root_board';
+
+      const props = {
+        ...mapStateToProps(state),
+        ...dispatchAndRouterProps,
+        match: { params: { id: 'b2' } } // Trying to access 'b2'
+      };
+
+      const wrapper = shallow(<BoardContainer {...props} />, {
+        disableLifecycleMethods: true
+      });
+      const instance = wrapper.instance();
+
+      // 2. Mock api failing
+      jest
+        .spyOn(instance, 'tryRemoteBoard')
+        .mockRejectedValue(new Error('API Timeout'));
+
+      await instance.componentDidMount();
+
+      // 3. Verifies if tried remote and correctly returned rootBoard
+      expect(instance.tryRemoteBoard).toHaveBeenCalledWith('b2');
+      expect(props.changeBoard).toHaveBeenCalledWith('root_board');
+      expect(props.history.replace).toHaveBeenCalledWith('root_board');
     });
   });
 });
