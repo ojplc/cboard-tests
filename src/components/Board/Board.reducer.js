@@ -80,7 +80,7 @@ function removeSyncMeta(syncMeta, boardId) {
   return next;
 }
 
-function resolveLastEdited(oldBoard, newBoard) {
+export function resolveLastEdited(oldBoard, newBoard) {
   const oldDate = oldBoard?.lastEdited ? moment(oldBoard.lastEdited) : null;
   const newDate = newBoard?.lastEdited ? moment(newBoard.lastEdited) : null;
 
