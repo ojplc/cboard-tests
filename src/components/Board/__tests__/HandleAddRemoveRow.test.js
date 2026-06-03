@@ -1,7 +1,20 @@
+jest.mock('mathjs', () => ({
+  resize: (arr, [rows, cols]) => {
+    return Array.from({ length: rows }, () =>
+      Array.from({ length: cols }, () => null)
+    );
+  }
+}));
 const { resize } = require('mathjs');
 
-
-function handleAddRemoveRow(isAdd, board, updateBoard, updateIfFeaturedBoard, saveApiBoardOperation, getDefaultOrdering) {
+function handleAddRemoveRow(
+  isAdd,
+  board,
+  updateBoard,
+  updateIfFeaturedBoard,
+  saveApiBoardOperation,
+  getDefaultOrdering
+) {
   const { grid, tiles } = board;
 
   if ((!isAdd && grid.rows > 1) || (isAdd && grid.rows < 12)) {
@@ -29,7 +42,6 @@ function handleAddRemoveRow(isAdd, board, updateBoard, updateIfFeaturedBoard, sa
     saveApiBoardOperation(processedBoard);
   }
 }
-
 
 function makeBoard(rows, order = null) {
   return {
@@ -64,12 +76,8 @@ function run(isAdd, rows, order = null) {
 }
 
 describe('handleAddRemoveRow', () => {
-
-
   describe('[CAIXA-PRETA] Particionamento de Equivalência', () => {
-
     it('PE-01 | isAdd=true, rows=5 (classe válida) → deve chamar updateBoard com rows=6', () => {
-
       const { updateBoard } = run(true, 5);
 
       expect(updateBoard).toHaveBeenCalled();
@@ -77,7 +85,6 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('PE-02 | isAdd=false, rows=5 (classe válida) → deve chamar updateBoard com rows=4', () => {
-
       const { updateBoard } = run(false, 5);
 
       expect(updateBoard).toHaveBeenCalled();
@@ -85,32 +92,26 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('PE-03 | isAdd=false, rows=1 (classe inválida) → NÃO deve chamar updateBoard', () => {
-
       const { updateBoard } = run(false, 1);
 
       expect(updateBoard).not.toHaveBeenCalled();
     });
 
     it('PE-04 | isAdd=true, rows=12 (classe inválida) → NÃO deve chamar updateBoard', () => {
-
       const { updateBoard } = run(true, 12);
 
       expect(updateBoard).not.toHaveBeenCalled();
     });
-
   });
 
   describe('[CAIXA-PRETA] Análise de Valor Limite', () => {
-
     it('VL-01 | isAdd=false, rows=1 (mínimo absoluto) → NÃO deve executar', () => {
-
       const { updateBoard } = run(false, 1);
 
       expect(updateBoard).not.toHaveBeenCalled();
     });
 
     it('VL-02 | isAdd=false, rows=2 (primeiro valor válido) → deve executar, rows=1', () => {
-
       const { updateBoard } = run(false, 2);
 
       expect(updateBoard).toHaveBeenCalled();
@@ -118,7 +119,6 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('VL-03 | isAdd=true, rows=11 (último valor válido) → deve executar, rows=12', () => {
-
       const { updateBoard } = run(true, 11);
 
       expect(updateBoard).toHaveBeenCalled();
@@ -126,20 +126,14 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('VL-04 | isAdd=true, rows=12 (máximo absoluto) → NÃO deve executar', () => {
-
       const { updateBoard } = run(true, 12);
 
       expect(updateBoard).not.toHaveBeenCalled();
     });
-
   });
 
-
-
   describe('[CAIXA-BRANCA] Cobertura de Branches', () => {
-
     it('BB-01 | order válido → deve usar resize(), NÃO getDefaultOrdering()', () => {
-
       const order = [[null, null], [null, null]];
       const { updateBoard, getDefaultOrdering } = run(true, 5, order);
 
@@ -148,7 +142,6 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('BB-02 | order=null → deve usar getDefaultOrdering()', () => {
-
       const { updateBoard, getDefaultOrdering } = run(true, 5, null);
 
       expect(updateBoard).toHaveBeenCalled();
@@ -156,52 +149,41 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('BB-03 | order=[] (array vazio) → deve usar getDefaultOrdering()', () => {
-
       const { updateBoard, getDefaultOrdering } = run(true, 5, []);
 
       expect(updateBoard).toHaveBeenCalled();
       expect(getDefaultOrdering).toHaveBeenCalled();
     });
-
   });
 
-
   describe('[CAIXA-BRANCA] MC/DC — Condição de guarda composta', () => {
-
     it('MC-01 | (!isAdd && rows>1)=true, (isAdd && rows<12)=false → executa', () => {
-
       const { updateBoard } = run(false, 5);
 
       expect(updateBoard).toHaveBeenCalled();
     });
 
     it('MC-02 | (!isAdd && rows>1)=false, (isAdd && rows<12)=true → executa', () => {
-
       const { updateBoard } = run(true, 5);
 
       expect(updateBoard).toHaveBeenCalled();
     });
 
     it('MC-03 | (!isAdd && rows>1)=false, (isAdd && rows<12)=false → NÃO executa', () => {
-
       const { updateBoard } = run(false, 1);
 
       expect(updateBoard).not.toHaveBeenCalled();
     });
-
   });
 
   describe('[INTEGRAÇÃO] Complementaridade caixa-preta + caixa-branca', () => {
-
     it('INT-01 | rows=1 bloqueado funcionalmente (PE) e estruturalmente (MC/DC)', () => {
-
       const { updateBoard } = run(false, 1);
 
       expect(updateBoard).not.toHaveBeenCalled();
     });
 
     it('INT-02 | saveApiBoardOperation deve ser chamado junto com updateBoard', () => {
-
       const { updateBoard, saveApiBoardOperation } = run(true, 5);
 
       expect(updateBoard).toHaveBeenCalled();
@@ -209,19 +191,26 @@ describe('handleAddRemoveRow', () => {
     });
 
     it('INT-03 | updateIfFeaturedBoard é chamado antes de updateBoard', () => {
-
       const board = makeBoard(5);
       const mocks = makeMocks();
       const callOrder = [];
 
-      mocks.updateIfFeaturedBoard.mockImplementation(b => { callOrder.push('updateIfFeaturedBoard'); return b; });
+      mocks.updateIfFeaturedBoard.mockImplementation(b => {
+        callOrder.push('updateIfFeaturedBoard');
+        return b;
+      });
       mocks.updateBoard.mockImplementation(() => callOrder.push('updateBoard'));
 
-      handleAddRemoveRow(true, board, mocks.updateBoard, mocks.updateIfFeaturedBoard, mocks.saveApiBoardOperation, mocks.getDefaultOrdering);
+      handleAddRemoveRow(
+        true,
+        board,
+        mocks.updateBoard,
+        mocks.updateIfFeaturedBoard,
+        mocks.saveApiBoardOperation,
+        mocks.getDefaultOrdering
+      );
 
       expect(callOrder).toEqual(['updateIfFeaturedBoard', 'updateBoard']);
     });
-
   });
-
 });
