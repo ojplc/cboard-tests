@@ -2,7 +2,10 @@ import React from 'react';
 import { shallowMatchSnapshot } from '../../../common/test_utils';
 import toJson from 'enzyme-to-json';
 import { shallow } from 'enzyme';
+import JSZip from 'jszip';
+import JSZipUtils from 'jszip-utils';
 
+import { cboardImportAdapter, obzImportAdapter } from './Import.helpers';
 import Import from './Import.component';
 
 jest.mock('./Import.messages', () => {
@@ -62,5 +65,321 @@ describe('Import tests', () => {
     const wrapper = shallow(<Import {...COMPONENT_PROPS} />);
     const cboard = wrapper.find('#file');
     cboard.prop('onChange')(event);
+  });
+});
+
+describe('tests for cboardImportAdapter refactor', () => {
+  test('Must import a new board correctly', async () => {
+    // 1. Mock new board as json
+    const newBoard = {
+      id: 'new-board',
+      name: 'New Board',
+      tiles: [
+        {
+          id: 'tile-1',
+          label: 'Test',
+          type: 'button'
+        }
+      ]
+    };
+
+    // 2. Create mock of file for FileReader
+    // Pass array of boards
+    const fileContent = JSON.stringify([newBoard]);
+    const mockFile = new File([fileContent], 'import.json', {
+      type: 'application/json'
+    });
+
+    // 3. Prepare other variables for cboardImportAdapter
+    const mockIntl = {};
+    const allBoardsEmpty = [];
+
+    // 4. Execute
+    const result = await cboardImportAdapter(
+      mockFile,
+      mockIntl,
+      allBoardsEmpty
+    );
+
+    // 5. Assert
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(newBoard);
+  });
+
+  test('Must ignore hidden boards', async () => {
+    // 1. Mock board with ext_cboard_hidden: true
+    const hiddenBoard = {
+      id: 'hidden-board',
+      name: 'Hidden Board',
+      ext_cboard_hidden: true,
+      tiles: []
+    };
+    // 2. Create mock file
+    const fileContent = JSON.stringify([hiddenBoard]);
+    const mockFile = new File([fileContent], 'import.json', {
+      type: 'application/json'
+    });
+    // 3. Execute
+    const result = await cboardImportAdapter(mockFile, {}, []);
+    // 4. Assert - hidden board must be ignored
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(0);
+  });
+
+  test('Must ignore board with id "root"', async () => {
+    const rootBoard = {
+      id: 'root',
+      name: 'Root Board',
+      tiles: []
+    };
+    const fileContent = JSON.stringify([rootBoard]);
+    const mockFile = new File([fileContent], 'import.json', {
+      type: 'application/json'
+    });
+    const result = await cboardImportAdapter(mockFile, {}, []);
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(0);
+  });
+
+  test('Must not discard board if the id already exists', async () => {
+    const rootBoard = {
+      id: 'boardRoot',
+      name: 'Board Root',
+      tiles: []
+    };
+    const fileContent = JSON.stringify([rootBoard]);
+    const mockFile = new File([fileContent], 'import.json', {
+      type: 'application/json'
+    });
+    const allBoards = [{ id: 'boardRoot' }];
+    const result = await cboardImportAdapter(mockFile, {}, allBoards);
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+  });
+
+  test('Must generate a new ID if there is a collision', async () => {
+    const collisionBoard = {
+      id: 'board-123',
+      name: 'Board with collision ID',
+      tiles: []
+    };
+    const fileContent = JSON.stringify([collisionBoard]);
+    const mockFile = new File([fileContent], 'import.json', {
+      type: 'application/json'
+    });
+    const allBoards = [{ id: 'board-123' }];
+
+    const result = await cboardImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).not.toBe('board-123');
+    expect(result[0].id).toBeDefined();
+  });
+
+  test('Must save the old ID in the prevId property in case of collision', async () => {
+    const collisionBoard = {
+      id: 'board-123',
+      name: 'Board with collision ID',
+      tiles: []
+    };
+    const fileContent = JSON.stringify([collisionBoard]);
+    const mockFile = new File([fileContent], 'import.json', {
+      type: 'application/json'
+    });
+    const allBoards = [{ id: 'board-123' }];
+
+    const result = await cboardImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+    expect(result[0].prevId).toBe('board-123');
+  });
+});
+
+describe('tests for obzImportAdapter', () => {
+  let originalCreateObjectURL;
+
+  beforeAll(() => {
+    originalCreateObjectURL = global.URL.createObjectURL;
+    global.URL.createObjectURL = jest.fn(() => 'blob:mock-url');
+  });
+
+  afterAll(() => {
+    global.URL.createObjectURL = originalCreateObjectURL;
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('Must correctly import a board whose ID does not exist in the system using .obz', async () => {
+    const zip = new JSZip();
+    const boardId = 'new-board';
+    const boardContent = {
+      id: boardId,
+      name: 'New Board from OBZ',
+      buttons: []
+    };
+    zip.file('board1.obf', JSON.stringify(boardContent));
+    const content = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const mockFile = new File([content], 'test.obz', {
+      type: 'application/zip'
+    });
+
+    jest
+      .spyOn(JSZipUtils, 'getBinaryContent')
+      .mockImplementation((path, callback) => {
+        callback(null, content);
+      });
+
+    const allBoards = [];
+    const result = await obzImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(boardId);
+  });
+
+  test('Must ignore hidden boards when importing from .obz', async () => {
+    const zip = new JSZip();
+    const boardId = 'new-board';
+    const boardContent = {
+      id: boardId,
+      name: 'New Board from OBZ',
+      buttons: [],
+      ext_cboard_hidden: true
+    };
+    zip.file('board1.obf', JSON.stringify(boardContent));
+    const content = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const mockFile = new File([content], 'test.obz', {
+      type: 'application/zip'
+    });
+
+    jest
+      .spyOn(JSZipUtils, 'getBinaryContent')
+      .mockImplementation((path, callback) => {
+        callback(null, content);
+      });
+
+    const allBoards = [];
+    const result = await obzImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(0);
+  });
+
+  test('Must ignore board with id "root" when importing from .obz', async () => {
+    const zip = new JSZip();
+    const boardContent = {
+      id: 'root',
+      name: 'Root Board',
+      buttons: []
+    };
+    zip.file('board1.obf', JSON.stringify(boardContent));
+    const content = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const mockFile = new File([content], 'test.obz', {
+      type: 'application/zip'
+    });
+
+    jest
+      .spyOn(JSZipUtils, 'getBinaryContent')
+      .mockImplementation((path, callback) => {
+        callback(null, content);
+      });
+
+    const allBoards = [];
+    const result = await obzImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(0);
+  });
+  test('Must not discard board if the ID already exists (obz)', async () => {
+    const zip = new JSZip();
+    const boardContent = {
+      id: 'board-123',
+      name: 'Existing Board',
+      buttons: []
+    };
+    zip.file('board1.obf', JSON.stringify(boardContent));
+    const content = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const mockFile = new File([content], 'test.obz', {
+      type: 'application/zip'
+    });
+
+    jest
+      .spyOn(JSZipUtils, 'getBinaryContent')
+      .mockImplementation((path, callback) => {
+        callback(null, content);
+      });
+
+    const allBoards = [{ id: 'board-123' }];
+    const result = await obzImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+  });
+
+  test('Must generate a new ID if there is a collision using .obz', async () => {
+    const zip = new JSZip();
+    const boardContent = {
+      id: 'board-123',
+      name: 'Board with collision',
+      buttons: []
+    };
+    zip.file('board1.obf', JSON.stringify(boardContent));
+    const content = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const mockFile = new File([content], 'test.obz', {
+      type: 'application/zip'
+    });
+
+    jest
+      .spyOn(JSZipUtils, 'getBinaryContent')
+      .mockImplementation((path, callback) => {
+        callback(null, content);
+      });
+
+    const allBoards = [{ id: 'board-123' }];
+    const result = await obzImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).not.toBe('board-123');
+    expect(result[0].id).toBeDefined();
+  });
+
+
+  test('Must save the old ID in the prevId property in case of collision', async () => {
+    const zip = new JSZip();
+    const boardContent = {
+      id: 'board-123',
+      name: 'Board with collision',
+      buttons: []
+    };
+    zip.file('board1.obf', JSON.stringify(boardContent));
+    const content = await zip.generateAsync({ type: 'arraybuffer' });
+
+    const mockFile = new File([content], 'test.obz', {
+      type: 'application/zip'
+    });
+
+    jest
+      .spyOn(JSZipUtils, 'getBinaryContent')
+      .mockImplementation((path, callback) => {
+        callback(null, content);
+      });
+
+    const allBoards = [{ id: 'board-123' }];
+    const result = await obzImportAdapter(mockFile, {}, allBoards);
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result).toHaveLength(1);
+    expect(result[0].prevId).toBe('board-123');
   });
 });
